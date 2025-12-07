@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Boleta</title>
+</head>
+<body>
+    <h1>Boleta de Registro</h1>
+
+    <p><strong>Fecha:</strong> {{ fecha }}</p>
+
+    <p><strong>Lugar de donde viene:</strong> {{ lugar }}</p>
+    <p><strong>Trimestre:</strong> {{ trimestre }}</p>
+    <p><strong>Hemoglobina:</strong> {{ hemoglobina }} g/dL</p>
+    <p><strong>Semanas de embarazo:</strong> {{ semanas }}</p>
+
+    <h3>Foto:</h3>
+    <img src="/uploads/{{ foto }}" width="250">
+
+    <h3>Resultado:</h3>
+    <p>{{ resultado }}</p>
+
+    <br><br>
+    <button onclick="window.print()">Imprimir</button>
+    <br><br>
+    <a href="/">Volver</a>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Boleta de Recoleccion de datos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            max-width: 800px;
+        }
+        h1 {
+            color: #333;
+        }
+        .instrucciones {
+            background: #f7f7f7;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 5px solid #0077cc;
+            margin-bottom: 25px;
+        }
+        .instrucciones h2 {
+            margin-top: 0;
+        }
+        img {
+            width: 100%;
+            max-width: 350px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        label {
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 8px 0 15px;
+        }
+        button {
+            background: #0077cc;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            cursor: pointer;
+            border-radius: 8px;
+        }
+        button:hover {
+            background: #005fa3;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Generar Boleta</h1>
+
+    <!-- 🔵 SECCIÓN DE INSTRUCCIONES -->
+    <div class="instrucciones">
+        <h2>📸 INSTRUCCIONES PARA TOMAR LA FOTO DE LA CONJUNTIVA</h2>
+
+        <img src="/static/instruccion_conjuntiva.png" alt="Ejemplo de conjuntiva">
+
+        <p><strong>1. Iluminación</strong><br>
+        • Luz natural o blanca.<br>
+        • Evitar sombras o contraluz.<br>
+        • No usar flash directo.</p>
+
+        <p><strong>2. Posición del paciente</strong><br>
+        • Mirada hacia arriba.<br>
+        • Párpado inferior traccionado suavemente hacia abajo.</p>
+
+        <p><strong>3. Distancia de la cámara</strong><br>
+        • 15 a 20 cm del ojo.<br>
+        • Que el ojo ocupe el 70–90% del cuadro.</p>
+
+        <p><strong>4. Enfoque</strong><br>
+        • Enfocar la conjuntiva, no las pestañas.<br>
+        • Activar modo “macro” si está disponible.</p>
+
+        <p><strong>5. Estabilidad</strong><br>
+        • Apoyar los codos o usar ambas manos.<br>
+        • Evitar movimiento.</p>
+
+        <p><strong>6. Limpieza</strong><br>
+        • Sin lágrimas excesivas.<br>
+        • Sin gotas recientes.<br>
+        • Sin brillo artificial.</p>
+
+        <p><strong>7. Condiciones constantes</strong><br>
+        • Repetir fotos siempre bajo las mismas condiciones.</p>
+    </div>
+
+    <!-- 🔵 FORMULARIO -->
+    <form action="/generar" method="POST" enctype="multipart/form-data">
+        
+        <label>Edad: </label>
+        <input type="text" name="lugar" required>
+
+        <label>Lugar de donde viene:</label>
+        <input type="text" name="lugar" required>
+
+        <label>Trimestre:</label>
+        <select name="trimestre" required>
+            <option value="1er trimestre">1er trimestre</option>
+            <option value="2do trimestre">2do trimestre</option>
+            <option value="3er trimestre">3er trimestre</option>
+        </select>
+
+        <label>Hemoglobina (g/dL):</label>
+        <input type="number" step="0.1" name="hemoglobina" required>
+
+        <label>Semanas de embarazo:</label>
+        <input type="number" name="semanas" required>
+
+        <label>Centro de atención:</label>
+        <textarea name="resultado" rows="4" required></textarea>
+
+        <label>Subir foto:</label>
+        <input type="file" name="photo" accept="image/*" required>
+
+        <button type="submit">Listo!!</button>
+    </form>
+
+</body>
+</html>
+
