@@ -10,16 +10,14 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-GOOGLE_DRIVE_FOLDER_ID = "1lkWk5WNYSSPPMg-Z_bH-dBbTsA7qz2eu"  # tu carpeta
+GOOGLE_DRIVE_FOLDER_ID = "1lkWk5WNYSSPPMg-Z_bH-dBbTsA7qz2eu"  # carpeta en Drive
 
 
 def create_drive_service():
     json_data = os.getenv("SERVICE_ACCOUNT_JSON")
-
     if not json_data:
         raise Exception("❌ ERROR: Falta la variable SERVICE_ACCOUNT_JSON en Render")
 
-    # Crear archivo temporal con el JSON
     with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
         tmp.write(json_data.encode("utf-8"))
         path = tmp.name
@@ -43,10 +41,10 @@ EXCEL_FILE = "registros_anemia.xlsx"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Crear Excel si no existe
+# Crear Excel con columna EDAD
 if not os.path.exists(EXCEL_FILE):
     df_init = pd.DataFrame(columns=[
-        "ID", "Lugar", "Trimestre", "Hemoglobina",
+        "ID", "Edad", "Lugar", "Trimestre", "Hemoglobina",
         "Semanas", "Resultado", "Foto", "Fecha"
     ])
     df_init.to_excel(EXCEL_FILE, index=False)
@@ -79,6 +77,7 @@ def index():
 
 @app.route("/generar", methods=["POST"])
 def generar():
+    edad = request.form["edad"]
     lugar = request.form["lugar"]
     trimestre = request.form["trimestre"]
     hemoglobina = request.form["hemoglobina"]
@@ -109,19 +108,19 @@ def generar():
         writer = csv.writer(f)
         if archivo_nuevo:
             writer.writerow([
-                "ID", "Lugar", "Trimestre", "Hemoglobina",
+                "ID", "Edad", "Lugar", "Trimestre", "Hemoglobina",
                 "Semanas", "Resultado", "Foto", "Fecha"
             ])
         writer.writerow([
-            numero_paciente, lugar, trimestre, hemoglobina, semanas,
-            resultado, nuevo_nombre,
+            numero_paciente, edad, lugar, trimestre, hemoglobina,
+            semanas, resultado, nuevo_nombre,
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ])
 
     # Guardar Excel
     df = pd.read_excel(EXCEL_FILE)
     df.loc[len(df)] = [
-        numero_paciente, lugar, trimestre, hemoglobina,
+        numero_paciente, edad, lugar, trimestre, hemoglobina,
         semanas, resultado, nuevo_nombre,
         datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ]
