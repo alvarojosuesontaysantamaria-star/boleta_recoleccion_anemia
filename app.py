@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, send_file
 import os
 import csv
 from datetime import datetime
@@ -88,6 +88,26 @@ def generar():
 
     return redirect(url_for("index"))
 
+@app.route("/descargar_excel")
+def descargar_excel():
+    if os.path.exists(EXCEL_FILE):
+        return send_file(
+            EXCEL_FILE,
+            as_attachment=True,
+            download_name="registros_anemia.xlsx"
+        )
+    return "No existe el archivo Excel", 404
+
+
+@app.route("/descargar_csv")
+def descargar_csv():
+    if os.path.exists(CSV_FILE):
+        return send_file(
+            CSV_FILE,
+            as_attachment=True,
+            download_name="registros_anemia.csv"
+        )
+    return "No existe el archivo CSV", 404
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
