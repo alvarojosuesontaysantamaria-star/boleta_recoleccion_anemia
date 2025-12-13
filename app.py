@@ -18,12 +18,12 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 SPREADSHEET_ID = "17I58LOPaHVIMueCR_c_aRi-79_-n7_v0BXjq-YjLlFU"
-SHEET_NAME = "Hoja 1"  # nombre por defecto del sheet
+SHEET_NAME = "Hoja 1"
 
 def get_sheets_service():
     json_data = os.getenv("SERVICE_ACCOUNT_JSON")
     if not json_data:
-        raise Exception("Falta SERVICE_ACCOUNT_JSON")
+        raise Exception("❌ Falta SERVICE_ACCOUNT_JSON en Render")
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
         tmp.write(json_data.encode("utf-8"))
@@ -47,11 +47,12 @@ def index():
 
 @app.route("/generar", methods=["POST"])
 def generar():
+    # 📋 DATOS DEL FORMULARIO
     edad = request.form["edad"]
+    centro = request.form["lugar"]
+    trimestre = request.form["trimestre"]
+    hemoglobina = request.form["hemoglobina"]
     semanas = request.form["semanas"]
-    lugar = request.form["lugar"]
-    resultado = request.form["resultado"]
-    probabilidad = request.form.get("probabilidad", "")
 
     # 📸 SUBIR IMAGEN A CLOUDINARY
     foto = request.files["photo"]
@@ -63,25 +64,25 @@ def generar():
 
     image_url = upload_result["secure_url"]
 
-    # 🧮 Número de paciente = filas actuales - encabezado
-    sheet = sheets_service.spreadsheets().values().get(
+    # 🔢 CALCULAR ID DE PACIENTE (filas actuales)
+    sheet_data = sheets_service.spreadsheets().values().get(
         spreadsheetId=SPREADSHEET_ID,
         range=f"{SHEET_NAME}!A:A"
     ).execute()
 
-    filas = len(sheet.get("values", []))
-    numero_paciente = filas  # porque fila 1 es encabezado
+    filas_actuales = len(sheet_data.get("values", []))
+    numero_paciente = filas_actuales  # fila 1 = encabezado
 
-    # 📝 DATOS A GUARDAR
+    # 📝 NUEVA FILA (orden EXACTO del Sheet)
     nueva_fila = [
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        numero_paciente,
-        edad,
-        semanas,
-        lugar,
-        resultado,
-        probabilidad,
-        image_url
+        numero_paciente,                         # A ID_Paciente
+        edad,                                    # B Edad
+        centro,                                  # C Centro_Atencion
+        trimestre,                               # D Trimestre
+        hemoglobina,                             # E Hemoglobina
+        semanas,                                 # F Semanas_Gestacion
+        image_url,                               # G URL_Imagen
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # H Fecha
     ]
 
     sheets_service.spreadsheets().values().append(
