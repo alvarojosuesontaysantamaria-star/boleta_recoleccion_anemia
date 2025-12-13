@@ -1,113 +1,97 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file
-import os
-import csv
+from flask import Flask, render_template, request, redirect, url_for
 from datetime import datetime
-import pandas as pd
+import os
+import tempfile
+
+# -------- CLOUDINARY --------
 import cloudinary
 import cloudinary.uploader
 
-app = Flask(__name__)
-
-# ================== CLOUDINARY ==================
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
     api_key=os.getenv("CLOUDINARY_API_KEY"),
-    api_secret=os.getenv("CLOUDINARY_API_SECRET")
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
 )
-# ===============================================
 
-CSV_FILE = "registros_anemia.csv"
-EXCEL_FILE = "registros_anemia.xlsx"
+# -------- GOOGLE SHEETS --------
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
-# Crear Excel si no existe
-if not os.path.exists(EXCEL_FILE):
-    df_init = pd.DataFrame(columns=[
-        "ID", "Edad", "Lugar", "Trimestre",
-        "Hemoglobina", "Semanas", "Resultado",
-        "Foto_URL", "Fecha"
-    ])
-    df_init.to_excel(EXCEL_FILE, index=False)
+SPREADSHEET_ID = "17I58LOPaHVIMueCR_c_aRi-79_-n7_v0BXjq-YjLlFU"
+SHEET_NAME = "Hoja 1"  # nombre por defecto del sheet
 
+def get_sheets_service():
+    json_data = os.getenv("SERVICE_ACCOUNT_JSON")
+    if not json_data:
+        raise Exception("Falta SERVICE_ACCOUNT_JSON")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
+        tmp.write(json_data.encode("utf-8"))
+        json_path = tmp.name
+
+    creds = service_account.Credentials.from_service_account_file(
+        json_path,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"]
+    )
+
+    return build("sheets", "v4", credentials=creds)
+
+sheets_service = get_sheets_service()
+
+# -------- APP --------
+app = Flask(__name__)
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
-
 @app.route("/generar", methods=["POST"])
 def generar():
     edad = request.form["edad"]
-    lugar = request.form["lugar"]
-    trimestre = request.form["trimestre"]
-    hemoglobina = request.form["hemoglobina"]
     semanas = request.form["semanas"]
+    lugar = request.form["lugar"]
     resultado = request.form["resultado"]
+    probabilidad = request.form.get("probabilidad", "")
+
+    # 📸 SUBIR IMAGEN A CLOUDINARY
     foto = request.files["photo"]
 
-    # Calcular ID
-    registros_previos = 0
-    if os.path.exists(CSV_FILE):
-        with open(CSV_FILE, "r", encoding="utf-8") as f:
-            registros_previos = sum(1 for _ in f) - 1
-    numero_paciente = registros_previos + 1
-
-    # Subir imagen a Cloudinary
     upload_result = cloudinary.uploader.upload(
         foto,
-        folder="anemia_conjuntiva",
-        public_id=f"paciente_{numero_paciente}"
+        folder="anemia_conjuntiva"
     )
-    foto_url = upload_result["secure_url"]
 
-    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    image_url = upload_result["secure_url"]
 
-    # Guardar CSV
-    archivo_nuevo = not os.path.exists(CSV_FILE)
-    with open(CSV_FILE, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        if archivo_nuevo:
-            writer.writerow([
-                "ID", "Edad", "Lugar", "Trimestre",
-                "Hemoglobina", "Semanas", "Resultado",
-                "Foto_URL", "Fecha"
-            ])
-        writer.writerow([
-            numero_paciente, edad, lugar, trimestre,
-            hemoglobina, semanas, resultado,
-            foto_url, fecha
-        ])
+    # 🧮 Número de paciente = filas actuales - encabezado
+    sheet = sheets_service.spreadsheets().values().get(
+        spreadsheetId=SPREADSHEET_ID,
+        range=f"{SHEET_NAME}!A:A"
+    ).execute()
 
-    # Guardar Excel
-    df = pd.read_excel(EXCEL_FILE)
-    df.loc[len(df)] = [
-        numero_paciente, edad, lugar, trimestre,
-        hemoglobina, semanas, resultado,
-        foto_url, fecha
+    filas = len(sheet.get("values", []))
+    numero_paciente = filas  # porque fila 1 es encabezado
+
+    # 📝 DATOS A GUARDAR
+    nueva_fila = [
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        numero_paciente,
+        edad,
+        semanas,
+        lugar,
+        resultado,
+        probabilidad,
+        image_url
     ]
-    df.to_excel(EXCEL_FILE, index=False)
+
+    sheets_service.spreadsheets().values().append(
+        spreadsheetId=SPREADSHEET_ID,
+        range=f"{SHEET_NAME}!A:H",
+        valueInputOption="USER_ENTERED",
+        body={"values": [nueva_fila]}
+    ).execute()
 
     return redirect(url_for("index"))
-
-@app.route("/descargar_excel")
-def descargar_excel():
-    if os.path.exists(EXCEL_FILE):
-        return send_file(
-            EXCEL_FILE,
-            as_attachment=True,
-            download_name="registros_anemia.xlsx"
-        )
-    return "No existe el archivo Excel", 404
-
-
-@app.route("/descargar_csv")
-def descargar_csv():
-    if os.path.exists(CSV_FILE):
-        return send_file(
-            CSV_FILE,
-            as_attachment=True,
-            download_name="registros_anemia.csv"
-        )
-    return "No existe el archivo CSV", 404
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
