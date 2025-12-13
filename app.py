@@ -91,7 +91,7 @@ def generar():
     sheets_service.spreadsheets().values().append(
         spreadsheetId=SPREADSHEET_ID,
         range=f"{SHEET_NAME}!A:I",
-        valueInputOption="USER_ENTERED",
+        valueInputOption="RAW",
         body={"values": [nueva_fila]}
     ).execute()
 
