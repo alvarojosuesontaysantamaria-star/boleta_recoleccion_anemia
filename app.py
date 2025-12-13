@@ -3,71 +3,30 @@ import os
 import csv
 from datetime import datetime
 import pandas as pd
-import tempfile
-
-# ---------- GOOGLE DRIVE ----------
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
-
-GOOGLE_DRIVE_FOLDER_ID = "1lkWk5WNYSSPPMg-Z_bH-dBbTsA7qz2eu"  # carpeta en Drive
-
-
-def create_drive_service():
-    json_data = os.getenv("SERVICE_ACCOUNT_JSON")
-    if not json_data:
-        raise Exception("❌ ERROR: Falta la variable SERVICE_ACCOUNT_JSON en Render")
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
-        tmp.write(json_data.encode("utf-8"))
-        path = tmp.name
-
-    creds = service_account.Credentials.from_service_account_file(
-        path,
-        scopes=["https://www.googleapis.com/auth/drive"]
-    )
-    return build("drive", "v3", credentials=creds)
-
-
-drive_service = create_drive_service()
-
-# ----------------------------------
+import cloudinary
+import cloudinary.uploader
 
 app = Flask(__name__)
 
-UPLOAD_FOLDER = "uploads"
+# ================== CLOUDINARY ==================
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET")
+)
+# ===============================================
+
 CSV_FILE = "registros_anemia.csv"
 EXCEL_FILE = "registros_anemia.xlsx"
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-# Crear Excel con columna EDAD
+# Crear Excel si no existe
 if not os.path.exists(EXCEL_FILE):
     df_init = pd.DataFrame(columns=[
-        "ID", "Edad", "Lugar", "Trimestre", "Hemoglobina",
-        "Semanas", "Resultado", "Foto", "Fecha"
+        "ID", "Edad", "Lugar", "Trimestre",
+        "Hemoglobina", "Semanas", "Resultado",
+        "Foto_URL", "Fecha"
     ])
     df_init.to_excel(EXCEL_FILE, index=False)
-
-
-# ----------- SUBIR ARCHIVO A DRIVE ----------------
-def upload_to_drive(filepath, filename):
-    file_metadata = {
-        "name": filename,
-        "parents": [GOOGLE_DRIVE_FOLDER_ID]
-    }
-
-    media = MediaFileUpload(filepath, resumable=True)
-
-    file = drive_service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields="id"
-    ).execute()
-
-    print("Archivo subido a Drive:", filename)
-    return file.get("id")
-# ---------------------------------------------------
 
 
 @app.route("/")
@@ -83,24 +42,24 @@ def generar():
     hemoglobina = request.form["hemoglobina"]
     semanas = request.form["semanas"]
     resultado = request.form["resultado"]
+    foto = request.files["photo"]
 
     # Calcular ID
     registros_previos = 0
     if os.path.exists(CSV_FILE):
         with open(CSV_FILE, "r", encoding="utf-8") as f:
             registros_previos = sum(1 for _ in f) - 1
-
     numero_paciente = registros_previos + 1
 
-    # Guardar foto
-    foto = request.files["photo"]
-    extension = foto.filename.split(".")[-1]
-    nuevo_nombre = f"paciente{numero_paciente}_conjuntiva.{extension}"
-    ruta_foto = os.path.join(UPLOAD_FOLDER, nuevo_nombre)
-    foto.save(ruta_foto)
+    # Subir imagen a Cloudinary
+    upload_result = cloudinary.uploader.upload(
+        foto,
+        folder="anemia_conjuntiva",
+        public_id=f"paciente_{numero_paciente}"
+    )
+    foto_url = upload_result["secure_url"]
 
-    # Subir foto
-    upload_to_drive(ruta_foto, nuevo_nombre)
+    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Guardar CSV
     archivo_nuevo = not os.path.exists(CSV_FILE)
@@ -108,29 +67,27 @@ def generar():
         writer = csv.writer(f)
         if archivo_nuevo:
             writer.writerow([
-                "ID", "Edad", "Lugar", "Trimestre", "Hemoglobina",
-                "Semanas", "Resultado", "Foto", "Fecha"
+                "ID", "Edad", "Lugar", "Trimestre",
+                "Hemoglobina", "Semanas", "Resultado",
+                "Foto_URL", "Fecha"
             ])
         writer.writerow([
-            numero_paciente, edad, lugar, trimestre, hemoglobina,
-            semanas, resultado, nuevo_nombre,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            numero_paciente, edad, lugar, trimestre,
+            hemoglobina, semanas, resultado,
+            foto_url, fecha
         ])
 
     # Guardar Excel
     df = pd.read_excel(EXCEL_FILE)
     df.loc[len(df)] = [
-        numero_paciente, edad, lugar, trimestre, hemoglobina,
-        semanas, resultado, nuevo_nombre,
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        numero_paciente, edad, lugar, trimestre,
+        hemoglobina, semanas, resultado,
+        foto_url, fecha
     ]
     df.to_excel(EXCEL_FILE, index=False)
-
-    # Subir Excel actualizado
-    upload_to_drive(EXCEL_FILE, "registros_anemia.xlsx")
 
     return redirect(url_for("index"))
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000, debug=True)
+    app.run(host="0.0.0.0", port=10000)
